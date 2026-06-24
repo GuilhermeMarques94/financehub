@@ -8,56 +8,111 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
-  <!-- LOGIN -->
+  <!-- ==================== LOGIN ==================== -->
   <div id="auth" class="auth-screen">
     <div class="card auth-card">
       <h1>💰 FinanceHub</h1>
-      <input id="email" type="email" placeholder="E-mail">
-      <input id="senha" type="password" placeholder="Senha">
-      <input id="nome" type="text" placeholder="Nome (só p/ cadastro)" style="display:none">
-      <button onclick="login()">Entrar</button>
-      <button class="ghost" onclick="toggleRegister()">Criar conta</button>
+      <p class="subtitle">Seu controle financeiro pessoal</p>
+      <input id="email" type="email" placeholder="E-mail" autocomplete="email">
+      <input id="senha" type="password" placeholder="Senha" autocomplete="current-password">
+      <input id="nome" type="text" placeholder="Nome completo" style="display:none">
+      <button onclick="login()" id="btn-submit">Entrar</button>
+      <button class="ghost" onclick="toggleRegister()" id="btn-toggle">Criar conta</button>
+      <a class="link" onclick="esqueciSenha()">Esqueci minha senha</a>
       <p id="msg" class="msg"></p>
     </div>
   </div>
 
-  <!-- APP -->
+  <!-- ==================== APP ==================== -->
   <div id="app" class="app" style="display:none">
+    <!-- Sidebar -->
     <aside class="sidebar">
       <h2>💰 FinanceHub</h2>
       <nav>
-        <a onclick="show('dashboard')">📊 Dashboard</a>
-        <a onclick="show('contas')">🏦 Contas</a>
-        <a onclick="show('lancamentos')">💸 Lançamentos</a>
+        <a class="nav-item active" data-sec="dashboard" onclick="show('dashboard')">📊 Dashboard</a>
+        <a class="nav-item" data-sec="contas" onclick="show('contas')">🏦 Contas</a>
+        <a class="nav-item" data-sec="lancamentos" onclick="show('lancamentos')">💸 Lançamentos</a>
+        <a class="nav-item" data-sec="cartoes" onclick="show('cartoes')">💳 Cartões</a>
       </nav>
-      <button class="ghost" onclick="logout()">Sair</button>
+      <div class="sidebar-footer">
+        <span id="user-name" class="user-name"></span>
+        <button class="ghost" onclick="logout()">Sair</button>
+      </div>
     </aside>
 
+    <!-- Conteúdo -->
     <main class="content">
+
+      <!-- ---------- Dashboard ---------- -->
       <section id="dashboard">
         <h1>Dashboard</h1>
         <div class="cards-grid">
-          <div class="card metric"><span>Saldo</span><h2 id="m-saldo">R$ 0</h2></div>
+          <div class="card metric"><span>Saldo Consolidado</span><h2 id="m-saldo">R$ 0</h2></div>
           <div class="card metric"><span>Receitas</span><h2 id="m-rec" class="green">R$ 0</h2></div>
           <div class="card metric"><span>Despesas</span><h2 id="m-desp" class="red">R$ 0</h2></div>
-          <div class="card metric"><span>Fluxo</span><h2 id="m-fluxo">R$ 0</h2></div>
+          <div class="card metric"><span>Fluxo de Caixa</span><h2 id="m-fluxo">R$ 0</h2></div>
         </div>
-        <div class="card"><canvas id="chartCat"></canvas></div>
+        <div class="charts-grid">
+          <div class="card chart-card">
+            <h3>Despesas por Categoria</h3>
+            <canvas id="chartCat"></canvas>
+          </div>
+        </div>
       </section>
 
+      <!-- ---------- Contas ---------- -->
       <section id="contas" style="display:none">
-        <h1>Contas</h1>
-        <button onclick="novaConta()">+ Nova Conta</button>
+        <div class="section-header">
+          <h1>Contas</h1>
+          <button onclick="novaConta()">+ Nova Conta</button>
+        </div>
         <div id="lista-contas" class="cards-grid"></div>
       </section>
 
+      <!-- ---------- Lançamentos ---------- -->
       <section id="lancamentos" style="display:none">
-        <h1>Lançamentos</h1>
-        <button onclick="novoLancamento()">+ Novo Lançamento</button>
-        <table id="tabela-lanc"><thead><tr>
-          <th>Data</th><th>Descrição</th><th>Tipo</th><th>Valor</th><th>Status</th>
-        </tr></thead><tbody></tbody></table>
+        <div class="section-header">
+          <h1>Lançamentos</h1>
+          <button onclick="novoLancamento()">+ Novo Lançamento</button>
+        </div>
+        <table id="tabela-lanc">
+          <thead>
+            <tr>
+              <th>Data</th><th>Descrição</th><th>Tipo</th><th>Valor</th><th>Status</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
       </section>
+
+      <!-- ---------- Cartões ---------- -->
+      <section id="cartoes" style="display:none">
+        <div class="section-header">
+          <h1>Cartões de Crédito</h1>
+          <button onclick="novoCartao()">+ Novo Cartão</button>
+        </div>
+        <div id="lista-cartoes" class="cards-grid"></div>
+
+        <!-- Painel de Faturas -->
+        <div id="painel-faturas" class="card" style="display:none; margin-top:24px">
+          <h2 id="faturas-titulo"></h2>
+          <div id="lista-faturas"></div>
+        </div>
+
+        <!-- Detalhe da Fatura -->
+        <div id="painel-detalhe" class="card" style="display:none; margin-top:24px">
+          <h3 id="detalhe-titulo"></h3>
+          <table>
+            <thead>
+              <tr>
+                <th>Data</th><th>Descrição</th><th>Parcela</th><th>Valor</th>
+              </tr>
+            </thead>
+            <tbody id="detalhe-itens"></tbody>
+          </table>
+        </div>
+      </section>
+
     </main>
   </div>
 

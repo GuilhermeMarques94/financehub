@@ -122,3 +122,118 @@ function initApp() {
 
 // Auto-login se houver token
 if (getToken()) initApp();
+
+// Atualize a lista de seções
+function show(sec) {
+  ["dashboard", "contas", "lancamentos", "cartoes"].forEach(s =>
+    document.getElementById(s).style.display = s === sec ? "block" : "none"
+  );
+  if (sec === "contas") loadContas();
+  if (sec === "lancamentos") loadLancamentos();
+  if (sec === "dashboard") loadDashboard();
+  if (sec === "cartoes") loadCartoes();
+}
+
+// ---------- CARTÕES ----------
+function pctClass(p) { return p < 50 ? "pct-ok" : p < 80 ? "pct-warn" : "pct-danger"; }
+
+async function loadCartoes() {
+  const cartoes = await request("/api/cartoes");
+  document.getElementById("painel-faturas").style.display = "none";
+  document.getElementById("painel-detalhe").style.display = "none";
+
+  document.getElementById("lista-cartoes").innerHTML = cartoes.map(c => `
+    <div class="credit-card" onclick="loadFaturas('${c.id}', '${c.nome.replace(/'/g, "")}')">
+      <span class="bandeira">${c.bandeira} ${c.principal ? "⭐" : ""}</span>
+      <div>
+        <strong>${c.nome}</strong>
+        <p style="font-size:12px;opacity:.8">${c.banco}</p>
+      </div>
+      <div>
+        <div class="saldo-limite">
+          Usado: ${fmt(c.limite_usado)} de ${fmt(c.limite_total)}
+        </div>
+        <div class="progress">
+          <div class="progress-bar ${pctClass(c.percentual_comprometido)}"
+               style="width:${Math.min(c.percentual_comprometido, 100)}%"></div>
+        </div>
+        <div class="saldo-limite">
+          Disponível: ${fmt(c.limite_disponivel)} • ${c.percentual_comprometido}% comprometido
+        </div>
+      </div>
+    </div>`).join("") || "<p>Nenhum cartão cadastrado.</p>";
+}
+
+async function novoCartao() {
+  const nome = prompt("Nome do cartão:");
+  if (!nome) return;
+  const banco = prompt("Banco emissor:") || "";
+  const bandeira = prompt("Bandeira (Visa/Mastercard/Elo):") || "Mastercard";
+  const limite_total = parseFloat(prompt("Limite total:") || "0");
+  const dia_fechamento = parseInt(prompt("Dia de fechamento (1-31):") || "1");
+  const dia_vencimento = parseInt(prompt("Dia de vencimento (1-31):") || "10");
+  const principal = confirm("É o cartão principal?");
+  await request("/api/cartoes", "POST", {
+    nome, banco, bandeira, limite_total, dia_fechamento, dia_vencimento, principal
+  });
+  loadCartoes();
+}
+
+const meses = ["", "Jan", "Fev", "Mar", "Abr", "Mai", "Jun",
+               "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+
+async function loadFaturas(cartaoId, nome) {
+  const faturas = await request(`/api/cartoes/${cartaoId}/faturas`);
+  document.getElementById("painel-detalhe").style.display = "none";
+  const painel = document.getElementById("painel-faturas");
+  painel.style.display = "block";
+  document.getElementById("faturas-titulo").textContent = `Faturas — ${nome}`;
+
+  document.getElementById("lista-faturas").innerHTML = faturas.map(f => `
+    <div class="fatura-row" onclick="loadDetalheFatura('${f.id}', '${meses[f.mes]}/${f.ano}')">
+      <div>
+        <strong>${meses[f.mes]}/${f.ano}</strong>
+        <p style="font-size:12px;color:#94a3b8">
+          Total: ${fmt(f.valor_total)} • Pago: ${fmt(f.valor_pago)} • Pendente: ${fmt(f.valor_pendente)}
+        </p>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <span class="badge ${f.fechada ? 'paga' : 'aberta'}">${f.fechada ? 'Paga' : 'Aberta'}</span>
+        ${f.valor_pendente > 0
+          ? `<button onclick="event.stopPropagation(); pagarFatura('${f.id}', ${f.valor_pendente})">Pagar</button>`
+          : ''}
+      </div>
+    </div>`).join("") || "<p>Nenhuma fatura gerada ainda.</p>";
+}
+
+async function loadDetalheFatura(faturaId, titulo) {
+  const f = await request(`/api/cartoes/faturas/${faturaId}`);
+  const painel = document.getElementById("painel-detalhe");
+  painel.style.display = "block";
+  document.getElementById("detalhe-titulo").textContent =
+    `Itens da fatura ${titulo} — Total ${fmt(f.valor_total)}`;
+  document.getElementById("detalhe-itens").innerHTML = f.itens.map(i => `
+    <tr>
+      <td>${i.data_competencia}</td>
+      <td>${i.descricao}</td>
+      <td>${i.parcelas_total ? `${i.parcela_atual}/${i.parcelas_total}` : '-'}</td>
+      <td class="red">${fmt(i.valor)}</td>
+    </tr>`).join("");
+  painel.scrollIntoView({ behavior: "smooth" });
+}
+
+async function pagarFatura(faturaId, pendente) {
+  const valor = parseFloat(prompt(`Valor a pagar (pendente: ${fmt(pendente)}):`, pendente) || "0");
+  if (!valor || valor <= 0) return;
+  // opcional: escolher conta de débito
+  const contas = await request("/api/contas");
+  let contaId = null;
+  if (contas.length) {
+    const lista = contas.map((c, idx) => `${idx + 1}) ${c.instituicao}`).join("\n");
+    const escolha = parseInt(prompt(`Debitar de qual conta?\n${lista}\n(0 = nenhuma)`) || "0");
+    if (escolha > 0 && contas[escolha - 1]) contaId = contas[escolha - 1].id;
+  }
+  await request(`/api/cartoes/faturas/${faturaId}/pagar`, "POST", { valor, conta_id: contaId });
+  alert("Pagamento registrado!");
+  loadCartoes();
+}

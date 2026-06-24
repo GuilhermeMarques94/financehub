@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.core.database import Base, engine
-from app.api import auth, contas, lancamentos, dashboard
+from app.api import auth, contas, lancamentos, dashboard, cartoes
 # importe também categorias, cartoes (mesmo padrão de contas)
 
 Base.metadata.create_all(bind=engine)
@@ -21,6 +21,7 @@ app.include_router(auth.router)
 app.include_router(contas.router)
 app.include_router(lancamentos.router)
 app.include_router(dashboard.router)
+app.include_router(cartoes.router)
 
 
 @app.get("/")

@@ -1,2 +1,3 @@
-import secrets
-print(secrets.token_hex(32))
+from passlib.context import CryptContext
+pwd = CryptContext(schemes=["bcrypt"], deprecated="auto")
+print(pwd.hash("Senha@123"))

@@ -35,3 +35,21 @@ th { color: var(--muted); font-size: 13px; }
   .app { flex-direction: column; }
   .sidebar { width: 100%; }
 }
+
+/* Cartão de crédito visual */
+.credit-card {
+  background: linear-gradient(135deg, #6366f1, #4338ca);
+  border-radius: 16px; padding: 20px; min-height: 160px;
+  display: flex; flex-direction: column; justify-content: space-between;
+  box-shadow: 0 8px 24px rgba(99,102,241,.3); position: relative;
+}
+.credit-card .bandeira { position: absolute; top: 16px; right: 20px; font-size: 13px; opacity: .8; }
+.credit-card .saldo-limite { font-size: 13px; opacity: .9; }
+.progress { height: 8px; background: rgba(255,255,255,.2); border-radius: 4px; margin: 8px 0; overflow: hidden; }
+.progress-bar { height: 100%; border-radius: 4px; transition: width .4s; }
+.pct-ok { background: #22c55e; } .pct-warn { background: #f59e0b; } .pct-danger { background: #ef4444; }
+.fatura-row { display: flex; justify-content: space-between; align-items: center; padding: 12px; border-bottom: 1px solid #334155; cursor: pointer; }
+.fatura-row:hover { background: #0f172a; }
+.badge { padding: 4px 10px; border-radius: 999px; font-size: 12px; }
+.badge.aberta { background: #f59e0b33; color: #f59e0b; }
+.badge.paga { background: #22c55e33; color: #22c55e; }
