@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FinanceHub</title>
+  <link rel="stylesheet" href="css/styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+  <!-- LOGIN -->
+  <div id="auth" class="auth-screen">
+    <div class="card auth-card">
+      <h1>💰 FinanceHub</h1>
+      <input id="email" type="email" placeholder="E-mail">
+      <input id="senha" type="password" placeholder="Senha">
+      <input id="nome" type="text" placeholder="Nome (só p/ cadastro)" style="display:none">
+      <button onclick="login()">Entrar</button>
+      <button class="ghost" onclick="toggleRegister()">Criar conta</button>
+      <p id="msg" class="msg"></p>
+    </div>
+  </div>
+
+  <!-- APP -->
+  <div id="app" class="app" style="display:none">
+    <aside class="sidebar">
+      <h2>💰 FinanceHub</h2>
+      <nav>
+        <a onclick="show('dashboard')">📊 Dashboard</a>
+        <a onclick="show('contas')">🏦 Contas</a>
+        <a onclick="show('lancamentos')">💸 Lançamentos</a>
+      </nav>
+      <button class="ghost" onclick="logout()">Sair</button>
+    </aside>
+
+    <main class="content">
+      <section id="dashboard">
+        <h1>Dashboard</h1>
+        <div class="cards-grid">
+          <div class="card metric"><span>Saldo</span><h2 id="m-saldo">R$ 0</h2></div>
+          <div class="card metric"><span>Receitas</span><h2 id="m-rec" class="green">R$ 0</h2></div>
+          <div class="card metric"><span>Despesas</span><h2 id="m-desp" class="red">R$ 0</h2></div>
+          <div class="card metric"><span>Fluxo</span><h2 id="m-fluxo">R$ 0</h2></div>
+        </div>
+        <div class="card"><canvas id="chartCat"></canvas></div>
+      </section>
+
+      <section id="contas" style="display:none">
+        <h1>Contas</h1>
+        <button onclick="novaConta()">+ Nova Conta</button>
+        <div id="lista-contas" class="cards-grid"></div>
+      </section>
+
+      <section id="lancamentos" style="display:none">
+        <h1>Lançamentos</h1>
+        <button onclick="novoLancamento()">+ Novo Lançamento</button>
+        <table id="tabela-lanc"><thead><tr>
+          <th>Data</th><th>Descrição</th><th>Tipo</th><th>Valor</th><th>Status</th>
+        </tr></thead><tbody></tbody></table>
+      </section>
+    </main>
+  </div>
+
+  <script src="js/api.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
