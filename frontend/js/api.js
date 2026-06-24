@@ -1,4 +1,4 @@
-const API = "https://financehub-api.onrender.com"; // sua URL do Render
+const API = "https://financehub-3kq3.onrender.com"; // sua URL do Render
 
 function getToken() { return localStorage.getItem("token"); }
 
