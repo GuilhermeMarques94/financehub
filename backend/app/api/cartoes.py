@@ -8,7 +8,7 @@ from app.schemas.cartoes import (
 )
 from app.services.cartao_service import CartaoService
 
-router = APIRouter(prefix="/api/cartoes", tags=["Cartões"])
+router = APIRouter(prefix="/cartoes", tags=["Cartões"])
 
 
 @router.get("", response_model=list[CartaoOut])

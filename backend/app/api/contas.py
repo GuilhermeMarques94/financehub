@@ -5,7 +5,7 @@ from app.api.deps import get_current_user
 from app.models import Conta, User
 from app.schemas import ContaCreate, ContaOut
 
-router = APIRouter(prefix="/api/contas", tags=["Contas"])
+router = APIRouter(prefix="/contas", tags=["Contas"])
 
 
 @router.get("", response_model=list[ContaOut])

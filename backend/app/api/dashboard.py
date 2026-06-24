@@ -5,7 +5,7 @@ from app.core.database import get_db
 from app.api.deps import get_current_user
 from app.models import Conta, Lancamento, Categoria, User
 
-router = APIRouter(prefix="/api/dashboard", tags=["Dashboard"])
+router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
 
 
 @router.get("")

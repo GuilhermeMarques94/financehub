@@ -7,7 +7,7 @@ from app.core.security import hash_password, verify_password, create_access_toke
 from app.models import User
 from app.schemas import UserCreate, Token, UserOut, PasswordReset, PasswordResetConfirm
 
-router = APIRouter(prefix="/api/auth", tags=["Auth"])
+router = APIRouter(prefix="/auth", tags=["Auth"])
 
 
 @router.post("/register", response_model=Token)
