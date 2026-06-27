@@ -1,0 +1,52 @@
+<section class="page">
+  <div class="page-head">
+    <h2 class="page-title">📝 Lançamentos</h2>
+    <button class="primary" onclick="novoLancamento()">+ Novo</button>
+  </div>
+
+  <!-- Filtros -->
+  <div class="filters">
+    <input id="f-busca" type="text" placeholder="🔍 Buscar descrição..." oninput="aplicarFiltros()" />
+    <select id="f-tipo" onchange="aplicarFiltros()">
+      <option value="">Todos os tipos</option>
+      <option value="receita">Receitas</option>
+      <option value="despesa">Despesas</option>
+    </select>
+    <select id="f-categoria" onchange="aplicarFiltros()">
+      <option value="">Todas categorias</option>
+    </select>
+    <select id="f-status" onchange="aplicarFiltros()">
+      <option value="">Todos status</option>
+      <option value="pago">Pago</option>
+      <option value="pendente">Pendente</option>
+    </select>
+    <input id="f-ini" type="date" onchange="aplicarFiltros()" title="Data inicial" />
+    <input id="f-fim" type="date" onchange="aplicarFiltros()" title="Data final" />
+    <button class="ghost" onclick="limparFiltros()">Limpar</button>
+  </div>
+
+  <!-- Totalizadores -->
+  <div class="totais">
+    <div class="total green"><span>Receitas</span><strong id="t-rec">R$ 0,00</strong></div>
+    <div class="total red"><span>Despesas</span><strong id="t-desp">R$ 0,00</strong></div>
+    <div class="total"><span>Saldo</span><strong id="t-saldo">R$ 0,00</strong></div>
+    <div class="total"><span>Registros</span><strong id="t-count">0</strong></div>
+  </div>
+
+  <div class="table-wrap">
+    <table id="tabela-lanc" class="table">
+      <thead>
+        <tr>
+          <th class="sortable" onclick="ordenar('data_competencia')">Data ⇅</th>
+          <th class="sortable" onclick="ordenar('descricao')">Descrição ⇅</th>
+          <th>Categoria</th>
+          <th>Tipo</th>
+          <th class="sortable" onclick="ordenar('valor')">Valor ⇅</th>
+          <th>Status</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+</section>

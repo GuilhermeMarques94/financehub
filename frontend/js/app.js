@@ -1,6 +1,23 @@
 let registerMode = false;
 let chart = null;
 
+const fmt = v => (v ?? 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+const meses = ["", "Jan", "Fev", "Mar", "Abr", "Mai", "Jun",
+               "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+
+const formatDate = d => {
+  if (!d) return "—";
+  const [y, m, day] = d.split("T")[0].split("-");
+  return `${day}/${m}/${y}`;
+};
+// ---------- AUTH ----------
+async function bootAuth() {
+  document.getElementById("app").style.display = "none";
+  const c = document.getElementById("auth-container");
+  c.style.display = "flex";
+  await loadPartial("auth-container", "partials/auth.html");
+}
+
 function toggleRegister() {
   registerMode = !registerMode;
   document.getElementById("nome").style.display = registerMode ? "block" : "none";
@@ -17,7 +34,6 @@ async function login() {
     if (registerMode) {
       data = await request("/api/auth/register", "POST", { nome, email, senha });
     } else {
-      // login usa form-urlencoded (OAuth2)
       const body = new URLSearchParams({ username: email, password: senha });
       const res = await fetch(`${API}/api/auth/login`, { method: "POST", body });
       if (!res.ok) throw new Error("Credenciais inválidas");
@@ -26,26 +42,24 @@ async function login() {
     localStorage.setItem("token", data.access_token);
     initApp();
   } catch (e) {
-    msg.textContent = e.message;
+    if (msg) msg.textContent = e.message;
   }
 }
 
 function logout() {
   localStorage.removeItem("token");
-  location.reload();
+  bootAuth();
 }
 
-function show(sec) {
-  ["dashboard", "contas", "lancamentos"].forEach(s =>
-    document.getElementById(s).style.display = s === sec ? "block" : "none"
-  );
-  if (sec === "contas") loadContas();
-  if (sec === "lancamentos") loadLancamentos();
-  if (sec === "dashboard") loadDashboard();
+async function initApp() {
+  const c = document.getElementById("auth-container");
+  c.innerHTML = "";
+  c.style.display = "none";
+  document.getElementById("app").style.display = "block";
+  await navTo("dashboard");
 }
 
-const fmt = v => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-
+// ---------- DASHBOARD ----------
 async function loadDashboard() {
   const d = await request("/api/dashboard");
   document.getElementById("m-saldo").textContent = fmt(d.saldo_consolidado);
@@ -54,6 +68,7 @@ async function loadDashboard() {
   document.getElementById("m-fluxo").textContent = fmt(d.fluxo_caixa);
 
   const ctx = document.getElementById("chartCat");
+  if (!ctx) return;
   if (chart) chart.destroy();
   chart = new Chart(ctx, {
     type: "doughnut",
@@ -68,6 +83,7 @@ async function loadDashboard() {
   });
 }
 
+// ---------- CONTAS ----------
 async function loadContas() {
   const contas = await request("/api/contas");
   document.getElementById("lista-contas").innerHTML = contas.map(c => `
@@ -76,71 +92,151 @@ async function loadContas() {
       <p style="color:#94a3b8">${c.tipo}</p>
       <h2>${fmt(c.saldo_atual)}</h2>
       <button class="ghost" onclick="delConta('${c.id}')">Excluir</button>
-    </div>`).join("");
+    </div>`).join("") || "<p>Nenhuma conta cadastrada.</p>";
 }
 
-async function novaConta() {
-  const instituicao = prompt("Nome da instituição:");
-  if (!instituicao) return;
-  const tipo = prompt("Tipo (corrente/poupanca/carteira):") || "corrente";
-  const saldo = parseFloat(prompt("Saldo inicial:") || "0");
-  await request("/api/contas", "POST", { instituicao, tipo, saldo_inicial: saldo });
-  loadContas();
+function novaConta() {
+  formModal({
+    title: "Nova Conta",
+    fields: [
+      { name: "instituicao", label: "Instituição", required: true },
+      { name: "tipo", label: "Tipo", type: "select", value: "corrente",
+        options: [
+          { value: "corrente", label: "Corrente" },
+          { value: "poupanca", label: "Poupança" },
+          { value: "carteira", label: "Carteira" },
+          { value: "investimento", label: "Investimento" },
+        ] },
+      { name: "saldo_inicial", label: "Saldo inicial", type: "number", value: 0 },
+    ],
+    onSubmit: async (data) => {
+      await request("/api/contas", "POST", data);
+      loadContas();
+    },
+  });
 }
 
 async function delConta(id) {
-  if (confirm("Excluir conta?")) { await request(`/api/contas/${id}`, "DELETE"); loadContas(); }
+  if (confirm("Excluir conta?")) {
+    await request(`/api/contas/${id}`, "DELETE");
+    loadContas();
+  }
 }
+
+// ---------- LANÇAMENTOS ----------
+// ---------- LANÇAMENTOS ----------
+let _lancamentos = [];
+let _categoriasMap = {};
+let _sort = { campo: "data_competencia", dir: -1 }; // -1 desc, 1 asc
 
 async function loadLancamentos() {
-  const list = await request("/api/lancamentos");
-  document.querySelector("#tabela-lanc tbody").innerHTML = list.map(l => `
+  const [list, cats] = await Promise.all([
+    request("/api/lancamentos"),
+    request("/api/categorias"),
+  ]);
+  _lancamentos = list;
+  _categoriasMap = Object.fromEntries(cats.map(c => [c.id, c]));
+
+  // popula filtro de categorias
+  const fcat = document.getElementById("f-categoria");
+  if (fcat) {
+    fcat.innerHTML = `<option value="">Todas categorias</option>` +
+      cats.map(c => `<option value="${c.id}">${c.nome}</option>`).join("");
+  }
+  aplicarFiltros();
+}
+
+function getFiltrados() {
+  const busca = (document.getElementById("f-busca")?.value || "").toLowerCase();
+  const tipo = document.getElementById("f-tipo")?.value || "";
+  const cat = document.getElementById("f-categoria")?.value || "";
+  const status = document.getElementById("f-status")?.value || "";
+  const ini = document.getElementById("f-ini")?.value || "";
+  const fim = document.getElementById("f-fim")?.value || "";
+
+  let res = _lancamentos.filter(l => {
+    if (busca && !l.descricao.toLowerCase().includes(busca)) return false;
+    if (tipo && l.tipo !== tipo) return false;
+    if (cat && String(l.categoria_id) !== cat) return false;
+    if (status && l.status !== status) return false;
+    if (ini && l.data_competencia < ini) return false;
+    if (fim && l.data_competencia > fim) return false;
+    return true;
+  });
+
+  const { campo, dir } = _sort;
+  res.sort((a, b) => {
+    let va = a[campo], vb = b[campo];
+    if (campo === "valor") { va = +va; vb = +vb; }
+    else { va = String(va ?? ""); vb = String(vb ?? ""); }
+    return va < vb ? -dir : va > vb ? dir : 0;
+  });
+  return res;
+}
+
+function aplicarFiltros() {
+  const list = getFiltrados();
+
+  // totalizadores
+  let rec = 0, desp = 0;
+  list.forEach(l => l.tipo === "receita" ? rec += +l.valor : desp += +l.valor);
+  document.getElementById("t-rec").textContent = fmt(rec);
+  document.getElementById("t-desp").textContent = fmt(desp);
+  const saldoEl = document.getElementById("t-saldo");
+  saldoEl.textContent = fmt(rec - desp);
+  saldoEl.className = (rec - desp) >= 0 ? "green" : "red";
+  document.getElementById("t-count").textContent = list.length;
+
+  // tabela
+  document.querySelector("#tabela-lanc tbody").innerHTML = list.map(l => {
+    const cat = _categoriasMap[l.categoria_id];
+    return `
     <tr>
-      <td>${l.data_competencia}</td>
+      <td>${formatDate(l.data_competencia)}</td>
       <td>${l.descricao}</td>
+      <td>${cat
+        ? `<span class="tag" style="background:${cat.cor}22;color:${cat.cor}">${cat.nome}</span>`
+        : '<span class="tag muted">—</span>'}</td>
       <td>${l.tipo}</td>
       <td class="${l.tipo === 'receita' ? 'green' : 'red'}">${fmt(l.valor)}</td>
-      <td>${l.status}</td>
-    </tr>`).join("");
+      <td><span class="badge ${l.status === 'pago' ? 'paga' : 'aberta'}">${l.status}</span></td>
+      <td>
+        <button class="ghost" onclick="editarLancamento('${l.id}')">✏️</button>
+        <button class="ghost" onclick="delLancamento('${l.id}')">🗑️</button>
+      </td>
+    </tr>`;
+  }).join("") || `<tr><td colspan="7" style="text-align:center;color:#64748b">Nenhum lançamento encontrado.</td></tr>`;
 }
 
-async function novoLancamento() {
-  const tipo = prompt("Tipo (receita/despesa):") || "despesa";
-  const descricao = prompt("Descrição:");
-  if (!descricao) return;
-  const valor = parseFloat(prompt("Valor:") || "0");
-  const data_competencia = new Date().toISOString().split("T")[0];
-  await request("/api/lancamentos", "POST", { tipo, descricao, valor, data_competencia, status: "pago" });
-  loadLancamentos();
+function ordenar(campo) {
+  if (_sort.campo === campo) _sort.dir *= -1;
+  else _sort = { campo, dir: 1 };
+  aplicarFiltros();
 }
 
-function initApp() {
-  document.getElementById("auth").style.display = "none";
-  document.getElementById("app").style.display = "flex";
-  show("dashboard");
+function limparFiltros() {
+  ["f-busca", "f-tipo", "f-categoria", "f-status", "f-ini", "f-fim"]
+    .forEach(id => { const el = document.getElementById(id); if (el) el.value = ""; });
+  aplicarFiltros();
 }
 
-// Auto-login se houver token
-if (getToken()) initApp();
-
-// Atualize a lista de seções
-function show(sec) {
-  ["dashboard", "contas", "lancamentos", "cartoes"].forEach(s =>
-    document.getElementById(s).style.display = s === sec ? "block" : "none"
-  );
-  if (sec === "contas") loadContas();
-  if (sec === "lancamentos") loadLancamentos();
-  if (sec === "dashboard") loadDashboard();
-  if (sec === "cartoes") loadCartoes();
+async function delLancamento(id) {
+  if (confirm("Excluir lançamento?")) {
+    await request(`/api/lancamentos/${id}`, "DELETE");
+    loadLancamentos();
+  }
 }
+
 
 // ---------- CARTÕES ----------
 function pctClass(p) { return p < 50 ? "pct-ok" : p < 80 ? "pct-warn" : "pct-danger"; }
 
 async function loadCartoes() {
   const cartoes = await request("/api/cartoes");
-  document.getElementById("painel-faturas").style.display = "none";
-  document.getElementById("painel-detalhe").style.display = "none";
+  const pf = document.getElementById("painel-faturas");
+  const pd = document.getElementById("painel-detalhe");
+  if (pf) pf.style.display = "none";
+  if (pd) pd.style.display = "none";
 
   document.getElementById("lista-cartoes").innerHTML = cartoes.map(c => `
     <div class="credit-card" onclick="loadFaturas('${c.id}', '${c.nome.replace(/'/g, "")}')">
@@ -150,9 +246,7 @@ async function loadCartoes() {
         <p style="font-size:12px;opacity:.8">${c.banco}</p>
       </div>
       <div>
-        <div class="saldo-limite">
-          Usado: ${fmt(c.limite_usado)} de ${fmt(c.limite_total)}
-        </div>
+        <div class="saldo-limite">Usado: ${fmt(c.limite_usado)} de ${fmt(c.limite_total)}</div>
         <div class="progress">
           <div class="progress-bar ${pctClass(c.percentual_comprometido)}"
                style="width:${Math.min(c.percentual_comprometido, 100)}%"></div>
@@ -164,23 +258,30 @@ async function loadCartoes() {
     </div>`).join("") || "<p>Nenhum cartão cadastrado.</p>";
 }
 
-async function novoCartao() {
-  const nome = prompt("Nome do cartão:");
-  if (!nome) return;
-  const banco = prompt("Banco emissor:") || "";
-  const bandeira = prompt("Bandeira (Visa/Mastercard/Elo):") || "Mastercard";
-  const limite_total = parseFloat(prompt("Limite total:") || "0");
-  const dia_fechamento = parseInt(prompt("Dia de fechamento (1-31):") || "1");
-  const dia_vencimento = parseInt(prompt("Dia de vencimento (1-31):") || "10");
-  const principal = confirm("É o cartão principal?");
-  await request("/api/cartoes", "POST", {
-    nome, banco, bandeira, limite_total, dia_fechamento, dia_vencimento, principal
+function novoCartao() {
+  formModal({
+    title: "Novo Cartão",
+    fields: [
+      { name: "nome", label: "Nome do cartão", required: true },
+      { name: "banco", label: "Banco emissor" },
+      { name: "bandeira", label: "Bandeira", type: "select", value: "Mastercard",
+        options: [
+          { value: "Mastercard", label: "Mastercard" },
+          { value: "Visa", label: "Visa" },
+          { value: "Elo", label: "Elo" },
+          { value: "Amex", label: "Amex" },
+        ] },
+      { name: "limite_total", label: "Limite total", type: "number", value: 0 },
+      { name: "dia_fechamento", label: "Dia de fechamento", type: "number", value: 1 },
+      { name: "dia_vencimento", label: "Dia de vencimento", type: "number", value: 10 },
+      { name: "principal", label: "É o cartão principal?", type: "checkbox", value: false },
+    ],
+    onSubmit: async (data) => {
+      await request("/api/cartoes", "POST", data);
+      loadCartoes();
+    },
   });
-  loadCartoes();
 }
-
-const meses = ["", "Jan", "Fev", "Mar", "Abr", "Mai", "Jun",
-               "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
 
 async function loadFaturas(cartaoId, nome) {
   const faturas = await request(`/api/cartoes/${cartaoId}/faturas`);
@@ -223,17 +324,106 @@ async function loadDetalheFatura(faturaId, titulo) {
 }
 
 async function pagarFatura(faturaId, pendente) {
-  const valor = parseFloat(prompt(`Valor a pagar (pendente: ${fmt(pendente)}):`, pendente) || "0");
-  if (!valor || valor <= 0) return;
-  // opcional: escolher conta de débito
   const contas = await request("/api/contas");
-  let contaId = null;
-  if (contas.length) {
-    const lista = contas.map((c, idx) => `${idx + 1}) ${c.instituicao}`).join("\n");
-    const escolha = parseInt(prompt(`Debitar de qual conta?\n${lista}\n(0 = nenhuma)`) || "0");
-    if (escolha > 0 && contas[escolha - 1]) contaId = contas[escolha - 1].id;
+  formModal({
+    title: "Pagar Fatura",
+    submitLabel: "Pagar",
+    fields: [
+      { name: "valor", label: "Valor a pagar", type: "number", value: pendente, required: true },
+      { name: "conta_id", label: "Debitar da conta", type: "select", value: "",
+        options: [{ value: "", label: "— Nenhuma —" },
+          ...contas.map(c => ({ value: c.id, label: c.instituicao }))] },
+    ],
+    onSubmit: async (data) => {
+      await request(`/api/cartoes/faturas/${faturaId}/pagar`, "POST", data);
+      loadCartoes();
+    },
+  });
+}
+
+
+// ---------- CATEGORIAS (Plano de Contas) ----------
+async function loadCategorias() {
+  const cats = await request("/api/categorias");
+  document.getElementById("lista-categorias").innerHTML = cats.map(c => `
+    <div class="card" style="border-left:4px solid ${c.cor}">
+      <h3>${c.nome}</h3>
+      <p style="color:#94a3b8">${c.tipo}${c.grupo ? ` • ${c.grupo}` : ''}</p>
+      <button class="ghost" onclick="delCategoria('${c.id}')">Excluir</button>
+    </div>`).join("") || "<p>Nenhuma categoria cadastrada.</p>";
+}
+
+function novaCategoria() {
+  formModal({
+    title: "Nova Categoria",
+    fields: [
+      { name: "nome", label: "Nome", required: true },
+      { name: "tipo", label: "Tipo", type: "select", value: "despesa",
+        options: [
+          { value: "despesa", label: "Despesa" },
+          { value: "receita", label: "Receita" },
+        ] },
+      { name: "grupo", label: "Grupo (opcional)" },
+      { name: "cor", label: "Cor", type: "color", value: "#6366f1" },
+    ],
+    onSubmit: async (data) => {
+      await request("/api/categorias", "POST", data);
+      loadCategorias();
+    },
+  });
+}
+
+async function delCategoria(id) {
+  if (confirm("Excluir categoria?")) {
+    await request(`/api/categorias/${id}`, "DELETE");
+    loadCategorias();
   }
-  await request(`/api/cartoes/faturas/${faturaId}/pagar`, "POST", { valor, conta_id: contaId });
-  alert("Pagamento registrado!");
-  loadCartoes();
+}
+
+// ---------- BOOT ----------
+window.addEventListener("DOMContentLoaded", () => {
+  if (getToken()) initApp();
+  else bootAuth();
+});
+
+async function editarLancamento(id) {
+  const [l, cats, contas, cartoes] = await Promise.all([
+    request(`/api/lancamentos/${id}`),
+    request("/api/categorias"), request("/api/contas"), request("/api/cartoes"),
+  ]);
+
+  formModal({
+    title: "Editar Lançamento",
+    submitLabel: "Atualizar",
+    fields: [
+      { name: "tipo", label: "Tipo", type: "select", value: l.tipo,
+        options: [
+          { value: "despesa", label: "Despesa" },
+          { value: "receita", label: "Receita" },
+        ] },
+      { name: "descricao", label: "Descrição", value: l.descricao, required: true },
+      { name: "valor", label: "Valor", type: "number", value: l.valor, required: true },
+      { name: "data_competencia", label: "Data competência", type: "date", value: l.data_competencia, required: true },
+      { name: "data_pagamento", label: "Data pagamento", type: "date", value: l.data_pagamento || "" },
+      { name: "categoria_id", label: "Categoria", type: "select", value: l.categoria_id || "",
+        options: [{ value: "", label: "— Sem categoria —" },
+          ...cats.map(c => ({ value: c.id, label: `${c.nome} (${c.tipo})` }))] },
+      { name: "conta_id", label: "Conta", type: "select", value: l.conta_id || "",
+        options: [{ value: "", label: "— Sem conta —" },
+          ...contas.map(c => ({ value: c.id, label: c.instituicao }))] },
+      { name: "cartao_id", label: "Cartão", type: "select", value: l.cartao_id || "",
+        options: [{ value: "", label: "— Sem cartão —" },
+          ...cartoes.map(c => ({ value: c.id, label: c.nome }))] },
+      { name: "status", label: "Status", type: "select", value: l.status,
+        options: [
+          { value: "pago", label: "Pago" },
+          { value: "pendente", label: "Pendente" },
+        ] },
+      { name: "observacoes", label: "Observações", value: l.observacoes || "" },
+    ],
+    onSubmit: async (data) => {
+      await request(`/api/lancamentos/${id}`, "PUT", data);
+      loadLancamentos();
+    },
+  });
 }

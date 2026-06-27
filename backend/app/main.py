@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.core.database import Base, engine
 from app.api import auth, contas, lancamentos, dashboard, cartoes
+from app.api import categorias
 
 Base.metadata.create_all(bind=engine)
 
@@ -26,6 +27,7 @@ app.include_router(contas.router, prefix="/api")
 app.include_router(lancamentos.router, prefix="/api")
 app.include_router(dashboard.router, prefix="/api")
 app.include_router(cartoes.router, prefix="/api")
+app.include_router(categorias.router, prefix="/api")
 
 
 @app.get("/")

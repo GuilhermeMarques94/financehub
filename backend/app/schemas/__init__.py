@@ -128,3 +128,26 @@ class LancamentoOut(ORMBase):
     parcelas_total: int | None
     status: str
     observacoes: str | None
+    criado_em: datetime
+
+# ---- Categoria (update) ----
+class CategoriaUpdate(BaseModel):
+    nome: str | None = None
+    tipo: str | None = None
+    grupo: str | None = None
+    cor: str | None = None
+    icone: str | None = None
+    parent_id: str | None = None
+
+# ---- Lancamento (update) ----
+class LancamentoUpdate(BaseModel):
+    tipo: str | None = None
+    descricao: str | None = None
+    valor: float | None = None
+    data_competencia: date | None = None
+    data_pagamento: date | None = None
+    conta_id: str | None = None
+    categoria_id: str | None = None
+    cartao_id: str | None = None
+    status: str | None = None
+    observacoes: str | None = None
